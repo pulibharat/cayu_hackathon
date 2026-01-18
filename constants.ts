@@ -1,5 +1,5 @@
 
-import { VaccineStatus, VaccineRecord } from './types';
+import { VaccineStatus, VaccineRecord } from './types.ts';
 
 // Cameroon EPI Schedule (WHO Aligned)
 export const EPI_SCHEDULE_CONFIG = [

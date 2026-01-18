@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { UserRole } from '../types';
+import { UserRole } from '../types.ts';
 
 interface SettingsViewProps {
   role: UserRole;
@@ -12,7 +12,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ role, onLogout }) =>
   const [notifications, setNotifications] = useState(true);
   const [radius, setRadius] = useState(15);
 
-  // Fix: Use React.ReactNode for children to ensure proper JSX typing for child elements/text nodes
   const SectionTitle = ({ children }: { children: React.ReactNode }) => (
     <h3 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.3em] mb-4 mt-8 px-2">{children}</h3>
   );

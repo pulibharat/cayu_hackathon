@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Baby, VaccineStatus } from '../types';
+import { Baby, VaccineStatus } from '../types.ts';
 
 interface BabyCardProps {
   baby: Baby;

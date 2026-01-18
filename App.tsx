@@ -1,17 +1,17 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { UserRole, Baby, VaccineStatus, ClinicStats, VaccineRecord, BabyLocation } from './types';
-import { generateInitialVaxRecord } from './constants';
-import { Layout } from './components/Layout';
-import { DashboardStats } from './components/DashboardStats';
-import { BabyCard } from './components/BabyCard';
-import { getPublicHealthInsights, analyzeHealthCard } from './services/geminiService';
-import { SplashScreen } from './components/SplashScreen';
-import { GrowthChart } from './components/GrowthChart';
-import { SettingsView } from './components/SettingsView';
-import { VaccineModal } from './components/VaccineModal';
-import { OutreachMap } from './components/OutreachMap';
-import { Logo } from './components/Logo';
+import { UserRole, Baby, VaccineStatus, ClinicStats, VaccineRecord, BabyLocation } from './types.ts';
+import { generateInitialVaxRecord } from './constants.ts';
+import { Layout } from './components/Layout.tsx';
+import { DashboardStats } from './components/DashboardStats.tsx';
+import { BabyCard } from './components/BabyCard.tsx';
+import { getPublicHealthInsights, analyzeHealthCard } from './services/geminiService.ts';
+import { SplashScreen } from './components/SplashScreen.tsx';
+import { GrowthChart } from './components/GrowthChart.tsx';
+import { SettingsView } from './components/SettingsView.tsx';
+import { VaccineModal } from './components/VaccineModal.tsx';
+import { OutreachMap } from './components/OutreachMap.tsx';
+import { Logo } from './components/Logo.tsx';
 
 // Declare jsQR for TypeScript
 declare const jsQR: any;

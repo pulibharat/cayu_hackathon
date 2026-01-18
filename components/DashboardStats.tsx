@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ClinicStats } from '../types';
+import { ClinicStats } from '../types.ts';
 
 interface DashboardStatsProps {
   stats: ClinicStats;
