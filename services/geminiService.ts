@@ -3,10 +3,10 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 export const getPublicHealthInsights = async (babyData: any[], stats: any) => {
   try {
-    // Creating a fresh instance to ensure current API Key is used
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    // Upgrading to gemini-3-pro-preview for advanced reasoning over health datasets
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3-pro-preview",
       contents: `You are a Public Health AI consultant for the Ministry of Health in Cameroon.
       Context: EPI (Expanded Programme on Immunization) session monitoring.
       
@@ -15,7 +15,7 @@ export const getPublicHealthInsights = async (babyData: any[], stats: any) => {
       - Completed Doses: ${stats.completedVaxCount}
       - Missed Doses: ${stats.missedDoseCount}
       
-      Clinic Data (JSON): ${JSON.stringify(babyData.slice(0, 10))}
+      Clinic Data (JSON): ${JSON.stringify(babyData.slice(0, 15))}
       
       Identify:
       1. One major risk (e.g., "30% drop off between Penta-1 and Penta-3 in Molyko village").
@@ -24,14 +24,15 @@ export const getPublicHealthInsights = async (babyData: any[], stats: any) => {
       
       Format your response as a cohesive, empathetic professional summary for a Midwife outreach lead. Keep it under 150 words.`,
       config: {
-        temperature: 0.6,
-        topP: 0.9,
+        temperature: 0.7,
+        topP: 0.95,
+        thinkingConfig: { thinkingBudget: 4000 }
       },
     });
 
     return response.text;
   } catch (error) {
-    console.error("Gemini Error:", error);
+    console.error("Gemini Insights Error:", error);
     return "Coverage alert: We are seeing a slight increase in missed Penta-2 doses in the Buea Town area. Suggest prioritizing home visits this Friday.";
   }
 };
@@ -46,9 +47,7 @@ export interface OCRResult {
 
 export const analyzeHealthCard = async (base64Image: string): Promise<OCRResult | null> => {
   try {
-    // Creating a fresh instance to ensure current API Key is used
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // Upgrading to gemini-3-pro-preview for complex vision task (handwritten clinical cards)
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
       contents: {
@@ -67,14 +66,23 @@ export const analyzeHealthCard = async (base64Image: string): Promise<OCRResult 
             Strictly return a JSON object with these keys: 
             firstName, lastName, dateOfBirth (format: YYYY-MM-DD), parentName, village.
             
-            Accuracy is critical. If a field is handwritten and messy, use surrounding context to infer the best match. 
-            If totally unreadable, return "".` 
+            Accuracy is critical. If unreadable, return "".` 
           }
         ]
       },
       config: {
         responseMimeType: "application/json",
-        // Adding thinkingConfig to allow the model to reason through character recognition errors.
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            firstName: { type: Type.STRING },
+            lastName: { type: Type.STRING },
+            dateOfBirth: { type: Type.STRING },
+            parentName: { type: Type.STRING },
+            village: { type: Type.STRING },
+          },
+          required: ["firstName", "lastName", "dateOfBirth", "parentName", "village"],
+        },
         thinkingConfig: { thinkingBudget: 2000 }
       }
     });
@@ -82,8 +90,8 @@ export const analyzeHealthCard = async (base64Image: string): Promise<OCRResult 
     const text = response.text;
     if (!text) return null;
     
-    // Clean potential markdown formatting from JSON response if present
-    const cleanJson = text.replace(/```json|```/g, "").trim();
+    // Improved regex to handle various markdown code block styles
+    const cleanJson = text.replace(/```(?:json)?\n?|```/g, "").trim();
     return JSON.parse(cleanJson) as OCRResult;
   } catch (error) {
     console.error("OCR Error:", error);

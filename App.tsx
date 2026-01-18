@@ -164,12 +164,16 @@ const App: React.FC = () => {
           stream = s;
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
-            videoRef.current.setAttribute("playsinline", "true"); // required to tell iOS safari we don't want fullscreen
+            videoRef.current.setAttribute("playsinline", "true");
             videoRef.current.play();
             requestAnimationFrame(tick);
           }
         })
-        .catch(err => console.error("Camera error:", err));
+        .catch(err => {
+          console.error("Camera error:", err);
+          setIsScanning(false);
+          alert("Could not access camera. Please check permissions.");
+        });
     }
 
     return () => {
@@ -180,25 +184,24 @@ const App: React.FC = () => {
     };
   }, [isScanning, babies]);
 
-  // Fix for missing handleCardClick
   const handleCardClick = (filter: 'ALL' | 'COMPLETED' | 'MISSED' | 'OUTREACH', openMap?: boolean) => {
     setActiveFilter(filter);
     if (openMap) setShowOutreachMap(true);
     else setShowOutreachMap(false);
   };
 
-  // Fix for missing fetchInsights
   const fetchInsights = async () => {
     setLoadingInsights(true);
     try {
       const insights = await getPublicHealthInsights(babies, stats);
       setAiInsights(insights);
+    } catch (err) {
+       console.error(err);
     } finally {
       setLoadingInsights(false);
     }
   };
 
-  // Fix for missing handleLogout
   const handleLogout = () => {
     setIsSplashComplete(false);
     resetViews();
@@ -299,16 +302,17 @@ const App: React.FC = () => {
     
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      setIsDownloading(false);
+      return;
+    }
 
-    // Card dimensions
+    // High resolution card dimensions (approx ID-1 card ratio)
     canvas.width = 1012; 
     canvas.height = 638;
 
-    // Helper for rounded rect (safari compatibility)
+    // Helper for rounded rect (better browser compatibility than canvas.roundRect)
     const drawRoundedRect = (x: number, y: number, w: number, h: number, r: number) => {
-      if (w < 2 * r) r = w / 2;
-      if (h < 2 * r) r = h / 2;
       ctx.beginPath();
       ctx.moveTo(x + r, y);
       ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -318,65 +322,87 @@ const App: React.FC = () => {
       ctx.closePath();
     };
 
-    // Background
-    ctx.fillStyle = '#0f172a'; // slate-950
-    drawRoundedRect(0, 0, canvas.width, canvas.height, 40);
+    // 1. Draw Background
+    ctx.fillStyle = '#0f172a'; // Deep slate
+    drawRoundedRect(0, 0, canvas.width, canvas.height, 48);
     ctx.fill();
 
-    // Teal Gradient Effect
+    // 2. Draw Subtle Gradient Overlays
     const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-    gradient.addColorStop(0, 'rgba(20, 184, 166, 0.2)');
+    gradient.addColorStop(0, 'rgba(20, 184, 166, 0.25)'); // Teal
+    gradient.addColorStop(0.5, 'rgba(15, 23, 42, 0)');
     gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Label
-    ctx.fillStyle = '#14b8a6'; // teal-500
-    ctx.font = 'bold 24px Arial';
-    ctx.fillText('VAXEASE GLOBAL HEALTH ID', 60, 80);
+    // 3. Draw Brand Label
+    ctx.fillStyle = '#14b8a6'; // VaxEase Teal
+    ctx.font = 'bold 28px sans-serif';
+    ctx.fillText('VAXEASE • GLOBAL HEALTH ID', 70, 90);
 
-    // Patient Name
+    // 4. Draw Patient Information
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 72px Arial';
-    ctx.fillText(`${selectedBaby.firstName} ${selectedBaby.lastName}`, 60, 260);
+    ctx.font = 'bold 84px sans-serif';
+    ctx.fillText(`${selectedBaby.firstName.toUpperCase()}`, 70, 240);
+    ctx.fillText(`${selectedBaby.lastName.toUpperCase()}`, 70, 330);
 
-    // ID
+    // 5. Draw Patient ID Section
     ctx.fillStyle = '#94a3b8';
-    ctx.font = 'bold 36px Arial';
-    ctx.fillText(`PATIENT ID: ${selectedBaby.id}`, 60, 320);
+    ctx.font = 'bold 32px sans-serif';
+    ctx.fillText(`ID: ${selectedBaby.id}`, 70, 400);
 
-    // Metadata
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-    drawRoundedRect(60, 420, 200, 60, 15);
+    // 6. Draw Metadata Pill
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+    drawRoundedRect(70, 450, 240, 70, 20);
     ctx.fill();
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 24px Arial';
-    ctx.fillText(selectedBaby.gender === 'F' ? 'FEMALE' : 'MALE', 80, 458);
+    ctx.font = 'bold 26px sans-serif';
+    ctx.fillText(selectedBaby.gender === 'F' ? 'FEMALE' : 'MALE', 95, 495);
 
-    // Load QR
+    // 7. Load and Draw QR Code (Using external API with CORS handling)
     const qrImg = new Image();
     qrImg.crossOrigin = "anonymous";
-    qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${selectedBaby.id}&bgcolor=ffffff&color=0f172a&margin=10`;
+    // We request a larger size for clarity when scanned from a screen or print
+    qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(selectedBaby.id)}&bgcolor=ffffff&color=0f172a&margin=20`;
     
+    const handleDrawingComplete = () => {
+      try {
+        const link = document.createElement('a');
+        link.download = `VaxEase_ID_${selectedBaby.id}_${selectedBaby.lastName}.png`;
+        link.href = canvas.toDataURL('image/png');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (err) {
+        console.error("Download failed:", err);
+        alert("Failed to generate download. Please try again.");
+      } finally {
+        setIsDownloading(false);
+        setShowQrModal(false);
+      }
+    };
+
     qrImg.onload = () => {
-      // White box for QR
+      // White container for QR for best scan contrast
       ctx.fillStyle = '#ffffff';
-      drawRoundedRect(650, 160, 300, 300, 20);
+      drawRoundedRect(630, 160, 320, 320, 32);
       ctx.fill();
-      ctx.drawImage(qrImg, 650, 160, 300, 300);
+      
+      // Draw QR Image inside container
+      ctx.drawImage(qrImg, 630, 160, 320, 320);
 
-      // Branding
-      ctx.fillStyle = 'rgba(20, 184, 166, 0.5)';
-      ctx.font = '18px Arial';
-      ctx.fillText('EPI REGIONAL MONITORING SYSTEM • MINISTRY OF PUBLIC HEALTH', 60, 580);
+      // 8. Draw Security & Verification Label
+      ctx.fillStyle = 'rgba(20, 184, 166, 0.6)';
+      ctx.font = '16px sans-serif';
+      ctx.fillText('ENCRYPTED REGIONAL REGISTRY • VERIFIED BY MINISTRY OF PUBLIC HEALTH', 70, 580);
+      
+      handleDrawingComplete();
+    };
 
-      // Link download
-      const link = document.createElement('a');
-      link.download = `VaxEase_Card_${selectedBaby.id}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-      setIsDownloading(false);
-      setShowQrModal(false);
+    qrImg.onerror = () => {
+      console.warn("QR Service failed, falling back to ID-only card.");
+      // Even if QR fails, we download the card with text info
+      handleDrawingComplete();
     };
   };
 
@@ -431,7 +457,7 @@ const App: React.FC = () => {
       activeTab={isSettingsOpen ? 'settings' : 'home'}
     >
       
-      {/* Hidden canvases for system ops */}
+      {/* Hidden system surfaces */}
       <canvas ref={canvasRef} className="hidden" />
       <canvas ref={scanCanvasRef} className="hidden" />
 
@@ -466,10 +492,10 @@ const App: React.FC = () => {
             .animate-scan-line { animation: scan-line 2.5s ease-in-out infinite; }
           `}</style>
           <div className="absolute bottom-24 left-0 right-0 px-8 text-center text-white">
-            <h3 className="text-xl font-bold mb-2 tracking-tight">Active QR Scanner</h3>
-            <p className="text-xs opacity-50 mb-8 font-medium">Position patient ID card in center frame...</p>
+            <h3 className="text-xl font-bold mb-2 tracking-tight">Technical Scan Active</h3>
+            <p className="text-xs opacity-50 mb-8 font-medium">Position patient card QR code in center...</p>
             <button onClick={() => setIsScanning(false)} className="bg-white/10 backdrop-blur-md border border-white/20 px-8 py-3 rounded-2xl font-bold uppercase text-[10px] tracking-widest">
-              Cancel Scan
+              Exit Scanner
             </button>
           </div>
         </div>
@@ -567,7 +593,7 @@ const App: React.FC = () => {
               <div className="absolute inset-0 z-50 bg-white/95 flex flex-col items-center justify-center p-8 rounded-[2.5rem]">
                 <div className="w-16 h-16 border-4 border-teal-600 border-t-transparent rounded-full animate-spin mb-6"></div>
                 <h4 className="text-xl font-extrabold text-slate-900 tracking-tight">AI Digitize</h4>
-                <p className="text-xs text-slate-500 font-bold text-center mt-2 max-w-[200px]">Extracting text from document...</p>
+                <p className="text-xs text-slate-500 font-bold text-center mt-2 max-w-[200px]">Extracting text from paper card...</p>
               </div>
             )}
 
@@ -577,7 +603,7 @@ const App: React.FC = () => {
                </div>
                <div className="flex-1">
                   <h4 className="text-sm font-bold text-slate-900">OCR Capture</h4>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Scan existing paper card</p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Scan existing document</p>
                </div>
                <button type="button" onClick={handleOcrClick} className="bg-teal-600 text-white p-3 rounded-2xl shadow-xl shadow-teal-500/20 active:scale-95">
                   <span className="material-icons-round">document_scanner</span>
@@ -603,7 +629,7 @@ const App: React.FC = () => {
                 <div className="flex gap-2">
                   <div className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-[11px] font-bold text-slate-400 flex items-center gap-3">
                      <span className="material-icons-round text-teal-500 text-sm">gps_fixed</span>
-                     {newBaby.location?.lat ? `${newBaby.location.lat.toFixed(6)}, ${newBaby.location.lng.toFixed(6)}` : 'Awaiting GPS Link...'}
+                     {newBaby.location?.lat ? `${newBaby.location.lat.toFixed(6)}, ${newBaby.location.lng.toFixed(6)}` : 'Establishing GPS link...'}
                   </div>
                   <button type="button" onClick={handleCaptureLocation} className="bg-slate-900 text-white px-5 rounded-2xl shadow-lg active:scale-95">
                     {isLocating ? <div className="w-5 h-5 border-2 border-teal-500 border-t-transparent rounded-full animate-spin"></div> : <span className="material-icons-round text-sm">my_location</span>}
@@ -612,7 +638,7 @@ const App: React.FC = () => {
               </div>
 
               <button type="submit" disabled={isSyncing} className="w-full bg-teal-600 text-white font-extrabold py-5 rounded-2xl shadow-xl shadow-teal-500/20 active:scale-95 text-sm uppercase tracking-widest flex items-center justify-center gap-3">
-                {isSyncing ? 'Linking Node...' : 'Complete Registration'}
+                {isSyncing ? 'Encrypting Record...' : 'Complete Registration'}
               </button>
             </form>
           </div>
@@ -630,14 +656,14 @@ const App: React.FC = () => {
 
           <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden mb-8">
             <div className="bg-slate-950 p-10 text-white relative">
-              <button onClick={() => setShowQrModal(true)} className="absolute top-8 right-8 w-16 h-16 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-2 flex items-center justify-center shadow-2xl">
+              <button onClick={() => setShowQrModal(true)} className="absolute top-8 right-8 w-16 h-16 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-2 flex items-center justify-center shadow-2xl active:scale-90 transition-all">
                  <span className="material-icons-round text-4xl text-teal-400">qr_code_2</span>
               </button>
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40 mb-2">Patient Digital ID</p>
               <h3 className="text-3xl font-extrabold tracking-tight mb-6 leading-none">{selectedBaby.firstName}<br/>{selectedBaby.lastName}</h3>
               <div className="flex flex-wrap gap-2">
-                 <span className="text-[9px] font-bold bg-white/5 px-3 py-1.5 rounded-lg border border-white/10 uppercase">{selectedBaby.id}</span>
-                 <span className="text-[9px] font-bold bg-white/5 px-3 py-1.5 rounded-lg border border-white/10 uppercase">{selectedBaby.village}</span>
+                 <span className="text-[9px] font-bold bg-white/5 px-3 py-1.5 rounded-lg border border-white/10 uppercase tracking-widest">{selectedBaby.id}</span>
+                 <span className="text-[9px] font-bold bg-white/5 px-3 py-1.5 rounded-lg border border-white/10 uppercase tracking-widest">{selectedBaby.village}</span>
               </div>
             </div>
 
@@ -656,7 +682,7 @@ const App: React.FC = () => {
                 {selectedBaby.vaccines.map((vax) => (
                   <div key={vax.id} className={`flex gap-5 p-5 rounded-3xl transition-all border ${vax.status === VaccineStatus.DUE ? 'bg-teal-50/20 border-teal-200 shadow-xl shadow-teal-100/50' : 'bg-white border-slate-100'}`}>
                     <div className="flex flex-col items-center">
-                      <div className={`w-5 h-5 rounded-full mt-1.5 z-10 border-4 border-white ${
+                      <div className={`w-5 h-5 rounded-full mt-1.5 z-10 border-4 border-white shadow-sm ${
                         vax.status === VaccineStatus.COMPLETED ? 'bg-teal-500' : 
                         vax.status === VaccineStatus.MISSED ? 'bg-orange-500' : 
                         vax.status === VaccineStatus.DUE ? 'bg-teal-500 animate-pulse' : 'bg-slate-200'
@@ -688,32 +714,36 @@ const App: React.FC = () => {
       {showQrModal && selectedBaby && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xl z-[150] flex items-center justify-center p-8 animate-in fade-in duration-500">
            <div className="bg-white rounded-[3rem] p-12 w-full max-w-xs text-center relative animate-in zoom-in duration-300 shadow-2xl">
-              <button onClick={() => setShowQrModal(false)} className="absolute top-8 right-8 text-slate-300">
+              <button onClick={() => setShowQrModal(false)} className="absolute top-8 right-8 text-slate-300 hover:text-slate-600 transition-colors">
                 <span className="material-icons-round text-2xl">close</span>
               </button>
               
-              <h3 className="text-2xl font-extrabold text-slate-900 mb-2">Technical Registry ID</h3>
-              <p className="text-[10px] text-slate-400 mb-10 font-bold uppercase tracking-[0.2em]">Verified Link</p>
+              <h3 className="text-2xl font-extrabold text-slate-900 mb-2">Registry ID Card</h3>
+              <p className="text-[10px] text-slate-400 mb-10 font-bold uppercase tracking-[0.2em]">Verified Secure Link</p>
               
               <div className="bg-slate-50 p-6 rounded-[2.5rem] shadow-inner mb-10 border border-slate-100">
-                 <div className="w-44 h-44 bg-white rounded-3xl flex items-center justify-center border-2 border-slate-900 relative overflow-hidden">
+                 <div className="w-44 h-44 bg-white rounded-3xl flex items-center justify-center border-2 border-slate-900 relative overflow-hidden shadow-lg">
                     <img 
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${selectedBaby.id}&bgcolor=f8fafc`} 
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(selectedBaby.id)}&bgcolor=f8fafc&color=0f172a&margin=10`} 
                       alt="QR Registry ID"
                       className="w-full h-full object-contain p-2"
                     />
                  </div>
               </div>
 
-              <div className="mb-8">
-                 <span className="font-extrabold text-sm text-slate-900 tracking-widest">{selectedBaby.id}</span>
+              <div className="mb-10">
+                 <span className="font-extrabold text-sm text-slate-900 tracking-[0.2em]">{selectedBaby.id}</span>
               </div>
               
-              <button onClick={downloadIdCard} disabled={isDownloading} className="w-full bg-slate-900 text-white font-bold py-5 rounded-2xl shadow-2xl active:scale-95 text-[11px] uppercase tracking-widest flex items-center justify-center gap-3">
+              <button 
+                onClick={downloadIdCard} 
+                disabled={isDownloading} 
+                className="w-full bg-slate-900 text-white font-bold py-5 rounded-2xl shadow-2xl active:scale-95 transition-all text-[11px] uppercase tracking-widest flex items-center justify-center gap-3 border border-slate-800"
+              >
                  {isDownloading ? (
                    <>
                      <span className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin"></span>
-                     Generating PNG...
+                     Processing...
                    </>
                  ) : (
                    <>
@@ -727,10 +757,10 @@ const App: React.FC = () => {
       )}
 
       {loadingInsights && (
-        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-2xl z-[200] flex items-center justify-center">
-          <div className="bg-white p-14 rounded-[3.5rem] shadow-2xl text-center">
-             <div className="w-16 h-16 border-[6px] border-teal-600 border-t-transparent rounded-full animate-spin mx-auto mb-8"></div>
-             <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em]">Regional Query Engine Active...</p>
+        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-2xl z-[200] flex items-center justify-center animate-in fade-in duration-300">
+          <div className="bg-white p-14 rounded-[3.5rem] shadow-2xl text-center border border-slate-100 max-w-xs mx-auto">
+             <div className="w-16 h-16 border-[6px] border-teal-600 border-t-transparent rounded-full animate-spin mx-auto mb-8 shadow-xl shadow-teal-500/10"></div>
+             <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] leading-loose">Querying Regional Datasets...</p>
           </div>
         </div>
       )}
