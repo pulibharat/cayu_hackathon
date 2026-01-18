@@ -29,6 +29,12 @@ export interface GrowthPoint {
   date: string;
 }
 
+export interface BabyLocation {
+  lat: number;
+  lng: number;
+  address?: string;
+}
+
 export interface Baby {
   id: string;
   firstName: string;
@@ -42,6 +48,7 @@ export interface Baby {
   vaccines: VaccineRecord[];
   qrCode: string;
   weightHistory?: GrowthPoint[];
+  location?: BabyLocation;
 }
 
 export interface ClinicStats {

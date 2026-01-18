@@ -2,6 +2,7 @@
   "name": "VaxEase: AI-for-Impact Vaccination System",
   "description": "A digital health platform designed for low-resource settings to track EPI-compliant vaccinations, reduce missed doses, and empower healthcare workers using AI-driven insights.",
   "requestFramePermissions": [
-    "camera"
+    "camera",
+    "geolocation"
   ]
 }
