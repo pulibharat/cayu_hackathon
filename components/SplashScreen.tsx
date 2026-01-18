@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Logo } from './Logo';
+import { Logo } from './Logo.tsx';
 
 export const SplashScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
   const [isVisible, setIsVisible] = useState(true);

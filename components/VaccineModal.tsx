@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { VaccineRecord } from '../types';
+import { VaccineRecord } from '../types.ts';
 
 interface VaccineModalProps {
   vaccine: VaccineRecord;

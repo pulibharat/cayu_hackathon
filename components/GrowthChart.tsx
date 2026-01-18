@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { GrowthPoint } from '../types';
+import { GrowthPoint } from '../types.ts';
 
 interface GrowthChartProps {
   data: GrowthPoint[];
