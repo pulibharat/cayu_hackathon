@@ -26,7 +26,15 @@ export interface VaccineRecord {
 export interface GrowthPoint {
   ageMonths: number;
   weightKg: number;
+  heightCm?: number;
   date: string;
+}
+
+export interface TrendPoint {
+  month: string;
+  completed: number;
+  missed: number;
+  due: number;
 }
 
 export interface BabyLocation {
@@ -41,9 +49,14 @@ export interface Baby {
   lastName: string;
   dateOfBirth: string;
   gender: 'M' | 'F';
+  weightAtBirth?: number;
+  heightAtBirth?: number;
   parentName: string;
   parentPhone: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
   village: string;
+  address?: string;
   registrationDate: string;
   vaccines: VaccineRecord[];
   qrCode: string;

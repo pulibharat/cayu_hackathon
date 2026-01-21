@@ -4,9 +4,8 @@ import { GoogleGenAI, Type } from "@google/genai";
 export const getPublicHealthInsights = async (babyData: any[], stats: any) => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // Upgrading to gemini-3-pro-preview for advanced reasoning over health datasets
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: `You are a Public Health AI consultant for the Ministry of Health in Cameroon.
       Context: EPI (Expanded Programme on Immunization) session monitoring.
       
@@ -26,7 +25,6 @@ export const getPublicHealthInsights = async (babyData: any[], stats: any) => {
       config: {
         temperature: 0.7,
         topP: 0.95,
-        thinkingConfig: { thinkingBudget: 4000 }
       },
     });
 
@@ -42,14 +40,17 @@ export interface OCRResult {
   lastName: string;
   dateOfBirth: string;
   parentName: string;
+  parentPhone: string;
   village: string;
+  weightAtBirth?: number;
+  registryNumber?: string;
 }
 
 export const analyzeHealthCard = async (base64Image: string): Promise<OCRResult | null> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: {
         parts: [
           { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
@@ -61,12 +62,15 @@ export const analyzeHealthCard = async (base64Image: string): Promise<OCRResult 
             - Child's Name (Nom et Prénom de l'enfant)
             - Date of Birth (Né(e) le)
             - Mother/Father/Guardian's Name (Nom de la mère/père/tuteur)
+            - Parent Phone Number (Téléphone)
             - Village, Quarter, or Place of Residence (Quartier/Village/Lieu de résidence)
+            - Weight at Birth (Poids à la naissance) in kg
+            - Registry/Health Card Number (N° de registre)
             
             Strictly return a JSON object with these keys: 
-            firstName, lastName, dateOfBirth (format: YYYY-MM-DD), parentName, village.
+            firstName, lastName, dateOfBirth (format: YYYY-MM-DD), parentName, parentPhone, village, weightAtBirth, registryNumber.
             
-            Accuracy is critical. If unreadable, return "".` 
+            Accuracy is critical. If a field is unreadable, return "".` 
           }
         ]
       },
@@ -79,18 +83,19 @@ export const analyzeHealthCard = async (base64Image: string): Promise<OCRResult 
             lastName: { type: Type.STRING },
             dateOfBirth: { type: Type.STRING },
             parentName: { type: Type.STRING },
+            parentPhone: { type: Type.STRING },
             village: { type: Type.STRING },
+            weightAtBirth: { type: Type.NUMBER },
+            registryNumber: { type: Type.STRING },
           },
-          required: ["firstName", "lastName", "dateOfBirth", "parentName", "village"],
+          required: ["firstName", "lastName", "dateOfBirth", "parentName", "parentPhone", "village"],
         },
-        thinkingConfig: { thinkingBudget: 2000 }
       }
     });
     
     const text = response.text;
     if (!text) return null;
     
-    // Improved regex to handle various markdown code block styles
     const cleanJson = text.replace(/```(?:json)?\n?|```/g, "").trim();
     return JSON.parse(cleanJson) as OCRResult;
   } catch (error) {
